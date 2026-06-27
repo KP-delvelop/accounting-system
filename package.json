@@ -12,6 +12,8 @@
     "test:encoding": "node scripts/encoding-guard-test.mjs",
     "test:attachments": "node scripts/attachment-storage-dir-test.mjs",
     "test:golden": "node scripts/golden-output-parity-test.mjs",
+    "test:supabase": "node scripts/supabase-hosted-smoke-test.mjs",
+    "supabase:seed-demo": "node scripts/supabase-seed-demo.mjs",
     "test:lifecycle": "node scripts/document-lifecycle-numbering-test.mjs",
     "test:api": "node scripts/api-smoke-test.mjs",
     "test:ui": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ui-smoke-test.ps1",
@@ -20,6 +22,7 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

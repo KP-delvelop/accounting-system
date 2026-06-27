@@ -116,6 +116,58 @@ body {
   background: var(--page);
 }
 
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--page);
+  color: var(--ink);
+}
+
+.auth-card {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 18px 48px var(--shadow);
+}
+
+.auth-card h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.auth-card p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.auth-card label {
+  display: grid;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.auth-card input {
+  min-height: 44px;
+}
+
+.auth-card button {
+  justify-content: center;
+}
+
+.auth-error {
+  padding: 10px 12px;
+  border: 1px solid var(--error-line);
+  border-radius: 6px;
+  color: var(--error-text);
+  background: var(--error-bg);
+}
+
 button,
 input,
 select {

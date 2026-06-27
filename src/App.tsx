@@ -414,6 +414,7 @@ export function App() {
   const storageLabel = storageMode === 'localhost-api' ? t('localhostDatabase') : t('browserFallback');
   const nextTheme = theme === 'dark' ? 'light' : 'dark';
   const authErrorLabel = authSession.error ? sessionErrorLabel(t, authSession.errorCode ?? undefined, authSession.error ?? undefined) : null;
+  const isHostedSession = authSession.mode === 'supabase';
   const currentNavItem = navItems.find((item) => item.view === view) ?? { view: 'dashboard' as View, icon: LayoutDashboard, labelKey: 'dashboard' };
   const CurrentNavIcon = currentNavItem.icon;
 
@@ -506,39 +507,55 @@ export function App() {
                 <div className="system-menu-header">
                   <ShieldCheck size={18} />
                   <div>
-                    <strong>{authSession.isRequired ? t('authRequired') : t('localSessionStub')}</strong>
-                    <span>{authSession.isRequired ? t('authRequiredHint') : t('localSessionStubHint')}</span>
+                    <strong>{isHostedSession ? 'Supabase session' : authSession.isRequired ? t('authRequired') : t('localSessionStub')}</strong>
+                    <span>
+                      {isHostedSession
+                        ? `${authSession.userLabel || 'Hosted user'}${authSession.roleKey ? ` · ${authSession.roleKey}` : ''}`
+                        : authSession.isRequired ? t('authRequiredHint') : t('localSessionStubHint')}
+                    </span>
                   </div>
                 </div>
                 <span className="pill ok" title={`${dataMode}: ${storageMode}; fallback: ${persistenceLayer}`}>
                   {storageLabel}
                 </span>
-                <div className={authSession.isRequired ? 'session-panel required' : 'session-panel'}>
-                  <input
-                    aria-label={t('localApiToken')}
-                    placeholder={t('localApiToken')}
-                    type="password"
-                    value={sessionTokenDraft}
-                    onChange={(event) => setSessionTokenDraft(event.target.value)}
-                  />
-                  <button className="secondary-action compact" type="button" onClick={() => authSession.setToken(sessionTokenDraft)}>
-                    {t('useToken')}
-                  </button>
+                {isHostedSession ? (
                   <button
                     className="secondary-action compact"
                     type="button"
-                    onClick={() => {
-                      setSessionTokenDraft('');
-                      authSession.clearToken();
-                    }}
+                    onClick={() => void authSession.logout()}
                   >
-                    {t('clearToken')}
+                    Logout
                   </button>
-                </div>
-                <button className="secondary-action compact reset-action" type="button" onClick={reset} title={t('resetDemo')}>
-                  <RefreshCcw size={16} />
-                  {t('resetDemo')}
-                </button>
+                ) : (
+                  <>
+                    <div className={authSession.isRequired ? 'session-panel required' : 'session-panel'}>
+                      <input
+                        aria-label={t('localApiToken')}
+                        placeholder={t('localApiToken')}
+                        type="password"
+                        value={sessionTokenDraft}
+                        onChange={(event) => setSessionTokenDraft(event.target.value)}
+                      />
+                      <button className="secondary-action compact" type="button" onClick={() => authSession.setToken(sessionTokenDraft)}>
+                        {t('useToken')}
+                      </button>
+                      <button
+                        className="secondary-action compact"
+                        type="button"
+                        onClick={() => {
+                          setSessionTokenDraft('');
+                          authSession.clearToken();
+                        }}
+                      >
+                        {t('clearToken')}
+                      </button>
+                    </div>
+                    <button className="secondary-action compact reset-action" type="button" onClick={reset} title={t('resetDemo')}>
+                      <RefreshCcw size={16} />
+                      {t('resetDemo')}
+                    </button>
+                  </>
+                )}
               </div>
             </details>
           </div>

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { executeAccountingAction } from './actions';
 import { initialState } from './seed';
+import { useHostedAuth } from './hostedAuth';
+import { getSupabaseClient, isSupabaseMode } from './supabaseClient';
 import type { AccountingActionRequest, AccountingActionResult } from './actions';
 import type { AppState, AttachmentOwnerType, AttachmentReference } from './types';
 
@@ -85,6 +87,69 @@ function stateRevisionHeader(response: Response) {
 
 function expectedRevisionHeaders(revision?: string | null): Record<string, string> {
   return revision ? { 'X-Codex-Expected-State-Revision': revision } : {};
+}
+
+async function sha256Hex(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function stateForHostedOrganization(state: AppState, organizationId: string, organizationName?: string, baseCurrency?: string): AppState {
+  return {
+    ...state,
+    organization: {
+      ...state.organization,
+      id: organizationId,
+      name: organizationName || state.organization.name,
+      baseCurrency: (baseCurrency as AppState['organization']['baseCurrency']) || state.organization.baseCurrency,
+    },
+  };
+}
+
+async function loadSupabaseState(organizationId: string) {
+  const client = getSupabaseClient();
+  if (!client) throw new ApiRequestError('Supabase is not configured.', 500, 'SUPABASE_NOT_CONFIGURED');
+  const { data, error } = await client
+    .from('app_states')
+    .select('state, revision')
+    .eq('organization_id', organizationId)
+    .maybeSingle();
+  if (error) throw new ApiRequestError(error.message, 500, 'SUPABASE_STATE_READ_FAILED');
+  if (!data?.state) return { state: null, revision: undefined };
+  return { state: data.state as AppState, revision: data.revision as string | undefined };
+}
+
+async function persistSupabaseState(state: AppState, organizationId: string, userId?: string | null) {
+  const client = getSupabaseClient();
+  if (!client) throw new ApiRequestError('Supabase is not configured.', 500, 'SUPABASE_NOT_CONFIGURED');
+  const revision = await sha256Hex(JSON.stringify(state));
+  const { error } = await client
+    .from('app_states')
+    .upsert({
+      organization_id: organizationId,
+      state,
+      revision,
+      updated_by: userId ?? null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'organization_id' });
+  if (error) {
+    const status = error.code === '42501' ? 403 : 500;
+    throw new ApiRequestError(authMessage(status, status === 403 ? 'PERMISSION_DENIED' : 'SUPABASE_STATE_WRITE_FAILED', error.message), status, error.code);
+  }
+  return { ok: true, revision };
+}
+
+function hostedStoragePath(organizationId: string, ownerType: AttachmentOwnerType, ownerId: string, attachmentId: string, fileName: string) {
+  const safeName = fileName.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'attachment';
+  return `${organizationId}/${ownerType}/${ownerId}/${attachmentId}-${safeName}`;
+}
+
+function base64ToBytes(value: string) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
 }
 
 function loadState(): AppState {
@@ -245,6 +310,7 @@ async function loadApiHealth() {
 }
 
 export function useAccountingState() {
+  const hostedAuth = useHostedAuth();
   const [state, setState] = useState<AppState>(() => loadState());
   const [storageMode, setStorageMode] = useState<StorageMode>('browser-local');
   const [authToken, setAuthTokenState] = useState(() => storedAuthToken());
@@ -262,6 +328,7 @@ export function useAccountingState() {
   }, []);
 
   useEffect(() => {
+    if (isSupabaseMode) return;
     let active = true;
 
     void loadApiHealth()
@@ -297,9 +364,58 @@ export function useAccountingState() {
     };
   }, [setMode, authToken]);
 
+  useEffect(() => {
+    if (!isSupabaseMode || !hostedAuth.ready || !hostedAuth.organization) return;
+    let active = true;
+    const organization = hostedAuth.organization;
+    void loadSupabaseState(organization.id)
+      .then(async ({ state: hostedState, revision }) => {
+        if (!active) return;
+        const nextState = hostedState
+          ? stateForHostedOrganization(hostedState, organization.id, organization.name, organization.baseCurrency)
+          : stateForHostedOrganization(initialState, organization.id, organization.name, organization.baseCurrency);
+        if (!hostedState) {
+          const saved = await persistSupabaseState(nextState, organization.id, hostedAuth.user?.id);
+          revision = saved.revision;
+        }
+        localApiReadyRef.current = false;
+        browserActionFallbackAllowedRef.current = false;
+        stateRevisionRef.current = revision ?? null;
+        setAuthError(null);
+        setAuthErrorCode(null);
+        setState(nextState);
+        persistBrowserState(nextState);
+        setMode('localhost-api');
+      })
+      .catch((error) => {
+        if (!active) return;
+        setAuthError(error instanceof Error ? error.message : 'Could not load Supabase state.');
+        setAuthErrorCode(error instanceof ApiRequestError ? error.code ?? null : null);
+        setMode('localhost-api');
+      });
+    return () => {
+      active = false;
+    };
+  }, [hostedAuth.organization, hostedAuth.ready, hostedAuth.user?.id, setMode]);
+
   const saveState = useCallback((nextState: AppState) => {
     setState(nextState);
     persistBrowserState(nextState);
+    if (isSupabaseMode && hostedAuth.organization) {
+      void persistSupabaseState(nextState, hostedAuth.organization.id, hostedAuth.user?.id)
+        .then(({ revision }) => {
+          stateRevisionRef.current = revision;
+          setAuthError(null);
+          setAuthErrorCode(null);
+          setMode('localhost-api');
+        })
+        .catch((error) => {
+          setAuthError(error instanceof Error ? error.message : 'Could not save Supabase state.');
+          setAuthErrorCode(error instanceof ApiRequestError ? error.code ?? null : null);
+          setMode('localhost-api');
+        });
+      return;
+    }
     const expectedRevision = stateRevisionRef.current;
     void persistApiState(nextState, expectedRevision)
       .then(({ revision }) => {
@@ -318,9 +434,22 @@ export function useAccountingState() {
         setAuthErrorCode(error instanceof ApiRequestError ? error.code ?? null : null);
         setMode(isConflict ? 'localhost-api' : 'browser-local');
       });
-  }, [setMode]);
+  }, [hostedAuth.organization, hostedAuth.user?.id, setMode]);
 
   const refreshLatestState = useCallback(async () => {
+    if (isSupabaseMode && hostedAuth.organization) {
+      const { state: hostedState, revision } = await loadSupabaseState(hostedAuth.organization.id);
+      const nextState = hostedState
+        ? stateForHostedOrganization(hostedState, hostedAuth.organization.id, hostedAuth.organization.name, hostedAuth.organization.baseCurrency)
+        : stateForHostedOrganization(initialState, hostedAuth.organization.id, hostedAuth.organization.name, hostedAuth.organization.baseCurrency);
+      stateRevisionRef.current = revision ?? null;
+      setAuthError(null);
+      setAuthErrorCode(null);
+      setState(nextState);
+      persistBrowserState(nextState);
+      setMode('localhost-api');
+      return nextState;
+    }
     const { state: apiState, revision } = await loadApiState();
     localApiReadyRef.current = true;
     browserActionFallbackAllowedRef.current = false;
@@ -331,9 +460,14 @@ export function useAccountingState() {
     persistBrowserState(apiState);
     setMode('localhost-api');
     return apiState;
-  }, [setMode]);
+  }, [hostedAuth.organization, setMode]);
 
   const resetState = useCallback(() => {
+    if (isSupabaseMode) {
+      setAuthError('Reset is disabled in hosted Supabase mode.');
+      setAuthErrorCode('ADMIN_REQUIRED');
+      return;
+    }
     void resetApiState()
       .then(({ state: apiState, revision }) => {
         localApiReadyRef.current = true;
@@ -354,6 +488,38 @@ export function useAccountingState() {
 
   const runAction = useCallback(
     async (request: AccountingActionRequest): Promise<AccountingActionResult> => {
+      if (isSupabaseMode && hostedAuth.organization) {
+        try {
+          const hostedRequest = {
+            ...request,
+            actor: {
+              actorType: 'user' as const,
+              actorId: hostedAuth.user?.id,
+              roleKey: hostedAuth.roleKey ?? 'viewer',
+              permissions: hostedAuth.permissions,
+            },
+          };
+          const nextState = executeAccountingAction(state, hostedRequest);
+          const scopedState = stateForHostedOrganization(
+            nextState,
+            hostedAuth.organization.id,
+            hostedAuth.organization.name,
+            hostedAuth.organization.baseCurrency,
+          );
+          const { revision } = await persistSupabaseState(scopedState, hostedAuth.organization.id, hostedAuth.user?.id);
+          stateRevisionRef.current = revision;
+          setAuthError(null);
+          setAuthErrorCode(null);
+          setState(scopedState);
+          persistBrowserState(scopedState);
+          setMode('localhost-api');
+          return { ok: true, state: scopedState };
+        } catch (error) {
+          setAuthError(error instanceof Error ? error.message : 'Supabase action failed.');
+          setAuthErrorCode(error instanceof ApiRequestError ? error.code ?? null : null);
+          return { ok: false, error: error instanceof Error ? error.message : 'Supabase action failed.' };
+        }
+      }
       try {
         const { state: apiState, revision } = await runApiAction(request, stateRevisionRef.current);
         localApiReadyRef.current = true;
@@ -392,7 +558,7 @@ export function useAccountingState() {
         }
       }
     },
-    [saveState, setMode, state],
+    [hostedAuth.organization, hostedAuth.permissions, hostedAuth.roleKey, hostedAuth.user?.id, saveState, setMode, state],
   );
 
   const handleApiState = useCallback((apiState: AppState, revision?: string) => {
@@ -408,6 +574,54 @@ export function useAccountingState() {
 
   const uploadAttachment = useCallback(
     async (request: AttachmentUploadRequest) => {
+      if (isSupabaseMode && hostedAuth.organization) {
+        try {
+          const client = getSupabaseClient();
+          if (!client) throw new ApiRequestError('Supabase is not configured.', 500, 'SUPABASE_NOT_CONFIGURED');
+          const attachmentId = `att-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+          const storagePath = hostedStoragePath(hostedAuth.organization.id, request.ownerType, request.ownerId, attachmentId, request.fileName);
+          const { error: uploadError } = await client.storage
+            .from(import.meta.env.VITE_SUPABASE_STORAGE_ATTACHMENT_BUCKET || 'attachments')
+            .upload(storagePath, base64ToBytes(request.contentBase64), {
+              contentType: request.contentType || 'application/octet-stream',
+              upsert: false,
+            });
+          if (uploadError) throw new ApiRequestError(uploadError.message, 400, 'ATTACHMENT_UPLOAD_FAILED');
+          const attachment: AttachmentReference = {
+            id: attachmentId,
+            organizationId: hostedAuth.organization.id,
+            ownerType: request.ownerType,
+            ownerId: request.ownerId,
+            name: request.fileName,
+            mimeType: request.contentType,
+            sizeBytes: base64ToBytes(request.contentBase64).byteLength,
+            storagePath,
+            createdAt: new Date().toISOString(),
+          };
+          const nextState: AppState = {
+            ...state,
+            attachments: [...(state.attachments ?? []), attachment],
+            cashTransactions: state.cashTransactions.map((item) =>
+              request.ownerType === 'cash_transaction' && item.id === request.ownerId
+                ? { ...item, attachmentIds: [...new Set([...(item.attachmentIds ?? []), attachment.id])] }
+                : item,
+            ),
+            documents: state.documents.map((item) =>
+              request.ownerType === 'document' && item.id === request.ownerId
+                ? { ...item, attachmentIds: [...new Set([...(item.attachmentIds ?? []), attachment.id])] }
+                : item,
+            ),
+          };
+          const { revision } = await persistSupabaseState(nextState, hostedAuth.organization.id, hostedAuth.user?.id);
+          stateRevisionRef.current = revision;
+          handleApiState(nextState, revision);
+          return { ok: true, attachment, state: nextState };
+        } catch (error) {
+          setAuthError(error instanceof Error ? error.message : null);
+          setAuthErrorCode(error instanceof ApiRequestError ? error.code ?? null : null);
+          return { ok: false, error: error instanceof Error ? error.message : 'Attachment upload failed.' };
+        }
+      }
       try {
         const result = await uploadApiAttachment(request, stateRevisionRef.current);
         handleApiState(result.state, result.revision);
@@ -418,10 +632,16 @@ export function useAccountingState() {
         return { ok: false, error: error instanceof Error ? error.message : 'Attachment upload failed.' };
       }
     },
-    [handleApiState],
+    [handleApiState, hostedAuth.organization, hostedAuth.user?.id, state],
   );
 
   const listAttachments = useCallback(async (ownerType: AttachmentOwnerType, ownerId: string) => {
+    if (isSupabaseMode) {
+      return {
+        ok: true,
+        attachments: (state.attachments ?? []).filter((attachment) => attachment.ownerType === ownerType && attachment.ownerId === ownerId),
+      };
+    }
     try {
       const result = await listApiAttachments(ownerType, ownerId);
       return { ok: true, attachments: result.attachments };
@@ -430,9 +650,34 @@ export function useAccountingState() {
       setAuthErrorCode(error instanceof ApiRequestError ? error.code ?? null : null);
       return { ok: false, error: error instanceof Error ? error.message : 'Attachment list failed.' };
     }
-  }, []);
+  }, [state.attachments]);
 
   const downloadAttachment = useCallback(async (attachment: AttachmentReference) => {
+    if (isSupabaseMode) {
+      try {
+        const client = getSupabaseClient();
+        if (!client || !attachment.storagePath) throw new ApiRequestError('Attachment storage path is unavailable.', 404, 'ATTACHMENT_NOT_FOUND');
+        const { data, error } = await client.storage
+          .from(import.meta.env.VITE_SUPABASE_STORAGE_ATTACHMENT_BUCKET || 'attachments')
+          .download(attachment.storagePath);
+        if (error) throw new ApiRequestError(error.message, 404, 'ATTACHMENT_DOWNLOAD_FAILED');
+        const url = URL.createObjectURL(data);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = attachment.name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        setAuthError(null);
+        setAuthErrorCode(null);
+        return { ok: true };
+      } catch (error) {
+        setAuthError(error instanceof Error ? error.message : null);
+        setAuthErrorCode(error instanceof ApiRequestError ? error.code ?? null : null);
+        return { ok: false, error: error instanceof Error ? error.message : 'Attachment download failed.' };
+      }
+    }
     try {
       const blob = await downloadApiAttachment(attachment.id);
       const url = URL.createObjectURL(blob);
@@ -455,6 +700,33 @@ export function useAccountingState() {
 
   const deleteAttachment = useCallback(
     async (attachmentId: string) => {
+      if (isSupabaseMode && hostedAuth.organization) {
+        try {
+          const client = getSupabaseClient();
+          if (!client) throw new ApiRequestError('Supabase is not configured.', 500, 'SUPABASE_NOT_CONFIGURED');
+          const attachment = (state.attachments ?? []).find((item) => item.id === attachmentId);
+          if (attachment?.storagePath) {
+            const { error: removeError } = await client.storage
+              .from(import.meta.env.VITE_SUPABASE_STORAGE_ATTACHMENT_BUCKET || 'attachments')
+              .remove([attachment.storagePath]);
+            if (removeError) throw new ApiRequestError(removeError.message, 400, 'ATTACHMENT_DELETE_FAILED');
+          }
+          const nextState: AppState = {
+            ...state,
+            attachments: (state.attachments ?? []).filter((item) => item.id !== attachmentId),
+            cashTransactions: state.cashTransactions.map((item) => ({ ...item, attachmentIds: (item.attachmentIds ?? []).filter((id) => id !== attachmentId) })),
+            documents: state.documents.map((item) => ({ ...item, attachmentIds: (item.attachmentIds ?? []).filter((id) => id !== attachmentId) })),
+          };
+          const { revision } = await persistSupabaseState(nextState, hostedAuth.organization.id, hostedAuth.user?.id);
+          stateRevisionRef.current = revision;
+          handleApiState(nextState, revision);
+          return { ok: true, state: nextState };
+        } catch (error) {
+          setAuthError(error instanceof Error ? error.message : null);
+          setAuthErrorCode(error instanceof ApiRequestError ? error.code ?? null : null);
+          return { ok: false, error: error instanceof Error ? error.message : 'Attachment delete failed.' };
+        }
+      }
       try {
         const result = await deleteApiAttachment(attachmentId, stateRevisionRef.current);
         handleApiState(result.state, result.revision);
@@ -465,7 +737,7 @@ export function useAccountingState() {
         return { ok: false, error: error instanceof Error ? error.message : 'Attachment delete failed.' };
       }
     },
-    [handleApiState],
+    [handleApiState, hostedAuth.organization, hostedAuth.user?.id, state],
   );
 
   return useMemo(
@@ -482,11 +754,15 @@ export function useAccountingState() {
         delete: deleteAttachment,
       },
       authSession: {
+        mode: isSupabaseMode ? 'supabase' : 'local',
         authMode,
         token: authToken,
         error: authError,
         isRequired: authMode === 'required',
         errorCode: authErrorCode,
+        userLabel: isSupabaseMode ? hostedAuth.displayName : '',
+        roleKey: isSupabaseMode ? hostedAuth.roleKey ?? '' : '',
+        logout: hostedAuth.signOut,
         refreshLatest: async () => {
           try {
             await refreshLatestState();
