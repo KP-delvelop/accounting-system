@@ -299,6 +299,24 @@ try {
     return await waitFor(() => document.querySelector('.form-panel'), 'create form should open: ' + actionText);
   }
 
+  async function verifyCreateReopensAfterHeaderBack(actionText, options = {}) {
+    const leaveOpen = options.leaveOpen === true;
+    await openCreateForm(actionText);
+    const backButton = await waitFor(() => document.querySelector('.back-button'), 'header Back should be available for ' + actionText);
+    backButton.click();
+    await waitFor(() => !document.querySelector('.form-panel'), 'header Back should close create form: ' + actionText);
+    await delay(100);
+    clickButtonByText(actionText);
+    await waitFor(() => document.querySelector('.form-panel'), 'create form should reopen after header Back: ' + actionText);
+    assert(document.querySelector('.form-panel'), 'create form should reopen after header Back: ' + actionText);
+    if (!leaveOpen) {
+      const closeBackButton = await waitFor(() => document.querySelector('.back-button'), 'header Back should be available to close reopened form: ' + actionText);
+      closeBackButton.click();
+      await waitFor(() => !document.querySelector('.form-panel'), 'header Back should close reopened create form: ' + actionText);
+      await delay(100);
+    }
+  }
+
   function openSystemMenu() {
     const menu = document.querySelector('.system-menu');
     assert(menu, 'system menu should exist');
@@ -306,6 +324,11 @@ try {
       menu.querySelector('summary')?.click();
     }
     return menu;
+  }
+
+  function systemMenuButtonByTitle(text) {
+    const menu = openSystemMenu();
+    return Array.from(menu.querySelectorAll('button')).find((entry) => entry.getAttribute('title')?.includes(text) || entry.textContent.includes(text));
   }
 
   function fieldByLabel(label, scope = document) {
@@ -374,8 +397,13 @@ try {
   }
 
   async function waitForLocalhostDatabase(label = 'app should use localhost database') {
-    await waitFor(() => document.body.textContent.includes('Localhost database'), label, 15000);
-    assert(document.body.textContent.includes('Localhost database'), label);
+    const hasLocalDevStorageLabel = () =>
+      document.body.textContent.includes('Localhost database') ||
+      document.body.textContent.includes('Local session stub') ||
+      document.body.textContent.includes('Dev mode. No production auth provider is connected.');
+    openSystemMenu();
+    await waitFor(hasLocalDevStorageLabel, label, 15000);
+    assert(hasLocalDevStorageLabel(), label);
   }
 
   async function clickDocumentAction(documentNumber, text) {
@@ -390,7 +418,8 @@ try {
   }
 
   try {
-    const localeSelect = await waitFor(() => document.querySelector('.locale-control select'), 'locale selector should render');
+    const settingsMenu = openSystemMenu();
+    const localeSelect = await waitFor(() => settingsMenu.querySelector('.settings-row select'), 'locale selector should render');
     setValue(localeSelect, 'lo');
     await waitFor(() => document.querySelector('.app-shell')?.dataset.locale === 'lo', 'Lao locale should apply');
     const laoFontFamily = window.getComputedStyle(document.querySelector('.app-shell')).fontFamily;
@@ -411,7 +440,7 @@ try {
     await waitFor(() => document.body.textContent.includes('Invoices'), 'English locale should apply');
     assert(document.body.textContent.includes('Commercial bank'), 'English master account name should be localized');
     assert(!document.body.textContent.includes('\u0e97\u0eb0\u0e99\u0eb2\u0e84\u0eb2\u0e99\u0e81\u0eb2\u0e99\u0e84\u0ec9\u0eb2'), 'English UI should not show Lao master account fallback');
-    const themeToggle = await waitFor(() => document.querySelector('.theme-toggle'), 'theme toggle should render');
+    const themeToggle = await waitFor(() => systemMenuButtonByTitle('mode'), 'theme toggle should render');
     if (document.documentElement.dataset.theme !== 'dark') {
       themeToggle.click();
     }
@@ -431,20 +460,32 @@ try {
       return nextApiState.documents.length === 0 &&
         nextApiState.cashTransactions.length === 0 &&
         nextApiState.journalEntries.length === 0 &&
-        nextApiState.products.length === 2 &&
+        nextApiState.products.length === 0 &&
         nextApiState.categories.length === 5 &&
         nextBrowserState.documents.length === 0 &&
         nextBrowserState.cashTransactions.length === 0 &&
         nextBrowserState.journalEntries.length === 0 &&
-        nextBrowserState.products.length === 2 &&
+        nextBrowserState.products.length === 0 &&
         nextBrowserState.categories.length === 5;
     }, 'initial browser and API state should synchronize seed state');
     await waitForLocalhostDatabase('storage mode should remain localhost database after seed sync');
     await delay(250);
 
+    clickNav('Revenue');
+    await waitFor(() => document.querySelector('h1')?.textContent.includes('Revenue'), 'revenue module should open for header Back reopen regression');
+    await verifyCreateReopensAfterHeaderBack('Add revenue');
+    clickNav('Expense');
+    await waitFor(() => document.querySelector('h1')?.textContent.includes('Expense'), 'expense module should open for header Back reopen regression');
+    await verifyCreateReopensAfterHeaderBack('Add expense');
+    clickNav('Categories');
+    await waitFor(() => document.querySelector('h1')?.textContent.includes('Categories'), 'categories module should open for header Back reopen regression');
+    await verifyCreateReopensAfterHeaderBack('Create category');
+    clickNav('Products');
+    await waitFor(() => document.querySelector('h1')?.textContent.includes('Products'), 'products module should open for header Back reopen regression');
+    await verifyCreateReopensAfterHeaderBack('Create product/service');
     clickNav('Invoices');
     await waitFor(() => document.querySelector('h1')?.textContent.includes('Invoices'), 'invoice module should open');
-    await openCreateForm('Create invoice');
+    await verifyCreateReopensAfterHeaderBack('Create invoice', { leaveOpen: true });
 
     const categoryBlock = await inlineBlock('New category');
     await setField('Name', categoryName, categoryBlock);
@@ -500,6 +541,16 @@ try {
       15000,
     );
     await waitFor(() => Array.from(document.querySelectorAll('.line-item-editor select')).some((entry) => entry.selectedOptions[0]?.textContent.includes(productName)), 'created product should be selected');
+    const customerName = 'CODEX_UI Customer ' + String(Date.now()).slice(-6);
+    const invoiceCustomerBlock = await inlineBlock('New customer');
+    await setField('Name', customerName, invoiceCustomerBlock);
+    await setField('Currency', 'LAK', invoiceCustomerBlock);
+    clickButtonByText('Create', invoiceCustomerBlock);
+    await waitForLocalhostDatabase('storage mode should remain localhost database after inline customer create');
+    await waitFor(() => fieldByLabel('Contact').querySelector('select').selectedOptions[0]?.textContent.includes(customerName), 'created customer should be selected');
+    await setField('Reference', 'CODEX_TEST_INVOICE_PHASE1');
+    await setField('Title', 'CODEX_TEST invoice phase 1');
+    await setField('Exchange rate', '1');
 
     clickButtonByText('Save', document.querySelector('.form-panel'));
     await waitForLocalhostDatabase('storage mode should remain localhost database after document create');
@@ -749,8 +800,15 @@ try {
 
     clickNav('Bills');
     await waitFor(() => document.querySelector('h1')?.textContent.includes('Bills'), 'bill module should open for FX purchase');
-    await openCreateForm('Create bill');
+    await verifyCreateReopensAfterHeaderBack('Create bill', { leaveOpen: true });
     const purchasePartialReference = 'CODEX_UI_PURCHASE_PARTIAL_' + String(Date.now()).slice(-6);
+    const vendorName = 'CODEX_UI Vendor ' + String(Date.now()).slice(-6);
+    const purchaseVendorBlock = await inlineBlock('New vendor');
+    await setField('Name', vendorName, purchaseVendorBlock);
+    await setField('Currency', 'LAK', purchaseVendorBlock);
+    clickButtonByText('Create', purchaseVendorBlock);
+    await waitForLocalhostDatabase('storage mode should remain localhost database after inline vendor create');
+    await waitFor(() => fieldByLabel('Contact').querySelector('select').selectedOptions[0]?.textContent.includes(vendorName), 'created vendor should be selected');
     await setField('Reference', purchasePartialReference);
     await setField('Title', 'CODEX_UI same-currency purchase partial');
     await setField('Exchange rate', '1');

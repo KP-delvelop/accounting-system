@@ -255,6 +255,16 @@ function addDaysIsoDate(days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+function useCloseOnBackRequest(backRequest: number, isOpen: boolean, onClose: () => void) {
+  const lastHandledBackRequestRef = useRef(backRequest);
+
+  useEffect(() => {
+    if (backRequest === lastHandledBackRequestRef.current) return;
+    lastHandledBackRequestRef.current = backRequest;
+    if (isOpen) onClose();
+  }, [backRequest, isOpen, onClose]);
+}
+
 function tagNames(state: AppStateShape, tagIds: string[] = []) {
   if (!tagIds.length) return '-';
   return tagIds.map((tagId) => (state.tags ?? []).find((tag) => tag.id === tagId)?.name ?? tagId).join(', ');
@@ -1045,9 +1055,7 @@ function CashModule({
     return () => onFormVisibilityChange(formView, false);
   }, [formView, onFormVisibilityChange, showCreate]);
 
-  useEffect(() => {
-    if (backRequest > 0 && showCreate) setShowCreate(false);
-  }, [backRequest, showCreate]);
+  useCloseOnBackRequest(backRequest, showCreate, () => setShowCreate(false));
 
   function handleCashCurrencyChange(value: string) {
     const currency = value as CurrencyCode;
@@ -1245,9 +1253,7 @@ function DocumentModule({
     return () => onFormVisibilityChange(formView, false);
   }, [formView, onFormVisibilityChange, showCreate]);
 
-  useEffect(() => {
-    if (backRequest > 0 && showCreate) setShowCreate(false);
-  }, [backRequest, showCreate]);
+  useCloseOnBackRequest(backRequest, showCreate, () => setShowCreate(false));
 
   function handleDocumentContactChange(value: string) {
     setContactId(value);
@@ -1952,9 +1958,7 @@ function CategoryModule({
     return () => onFormVisibilityChange(formView, false);
   }, [formView, onFormVisibilityChange, showCreate]);
 
-  useEffect(() => {
-    if (backRequest > 0 && showCreate) setShowCreate(false);
-  }, [backRequest, showCreate]);
+  useCloseOnBackRequest(backRequest, showCreate, () => setShowCreate(false));
 
   function changeKind(nextKind: string) {
     const categoryKind = nextKind as CashTransactionKind | DocumentKind;
@@ -2059,9 +2063,7 @@ function ProductModule({
     return () => onFormVisibilityChange(formView, false);
   }, [formView, onFormVisibilityChange, showCreate]);
 
-  useEffect(() => {
-    if (backRequest > 0 && showCreate) setShowCreate(false);
-  }, [backRequest, showCreate]);
+  useCloseOnBackRequest(backRequest, showCreate, () => setShowCreate(false));
 
   async function submit() {
     const result = await onAction({
