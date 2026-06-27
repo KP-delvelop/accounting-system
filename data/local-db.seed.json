@@ -1,0 +1,276 @@
+{
+  "organization": {
+    "id": "org-demo",
+    "name": "Thipphavanhtik",
+    "baseCurrency": "LAK"
+  },
+  "accounts": [
+    {
+      "id": "acc-bank-lak",
+      "organizationId": "org-demo",
+      "code": "1010",
+      "name": "ທະນາຄານການຄ້າ (LAK)",
+      "currency": "LAK",
+      "kind": "bank",
+      "normalBalance": "debit",
+      "openingBalance": 0
+    },
+    {
+      "id": "acc-cash-lak",
+      "organizationId": "org-demo",
+      "code": "1011",
+      "name": "ເງິນສົດເປັນເງິນກີບ",
+      "currency": "LAK",
+      "kind": "cash",
+      "normalBalance": "debit",
+      "openingBalance": 0
+    },
+    {
+      "id": "acc-bank-thb",
+      "organizationId": "org-demo",
+      "code": "1012",
+      "name": "ທະນາຄານຮ່ວມພັດທະນາ (THB)",
+      "currency": "THB",
+      "kind": "bank",
+      "normalBalance": "debit",
+      "openingBalance": 0
+    },
+    {
+      "id": "acc-bank-usd",
+      "organizationId": "org-demo",
+      "code": "1013",
+      "name": "ທະນາຄານພັດທະນາລາວ (USD)",
+      "currency": "USD",
+      "kind": "bank",
+      "normalBalance": "debit",
+      "openingBalance": 0
+    },
+    {
+      "id": "acc-income-service",
+      "organizationId": "org-demo",
+      "code": "708",
+      "name": "ຂາຍການບໍລິການອື່ນໆ",
+      "currency": "LAK",
+      "kind": "income",
+      "normalBalance": "credit",
+      "openingBalance": 0
+    },
+    {
+      "id": "acc-income-product",
+      "organizationId": "org-demo",
+      "code": "707",
+      "name": "ຂາຍສິນຄ້າ",
+      "currency": "LAK",
+      "kind": "income",
+      "normalBalance": "credit",
+      "openingBalance": 0
+    },
+    {
+      "id": "acc-exchange-gain",
+      "organizationId": "org-demo",
+      "code": "715",
+      "name": "Exchange gain",
+      "currency": "LAK",
+      "kind": "income",
+      "normalBalance": "credit",
+      "openingBalance": 0
+    },
+    {
+      "id": "acc-expense-admin",
+      "organizationId": "org-demo",
+      "code": "606.1",
+      "name": "ຄ່າໃຊ້ຈ່າຍທົ່ວໄປແລະການບໍລິຫານ",
+      "currency": "LAK",
+      "kind": "expense",
+      "normalBalance": "debit",
+      "openingBalance": 0
+    },
+    {
+      "id": "acc-exchange-loss",
+      "organizationId": "org-demo",
+      "code": "615",
+      "name": "Exchange loss",
+      "currency": "LAK",
+      "kind": "expense",
+      "normalBalance": "debit",
+      "openingBalance": 0
+    },
+    {
+      "id": "acc-bank-fee-expense",
+      "organizationId": "org-demo",
+      "code": "610",
+      "name": "Bank fees",
+      "currency": "LAK",
+      "kind": "expense",
+      "normalBalance": "debit",
+      "openingBalance": 0
+    },
+    {
+      "id": "acc-wht-receivable",
+      "organizationId": "org-demo",
+      "code": "1150",
+      "name": "Withholding tax receivable",
+      "currency": "LAK",
+      "kind": "asset",
+      "normalBalance": "debit",
+      "openingBalance": 0
+    },
+    {
+      "id": "acc-wht-payable",
+      "organizationId": "org-demo",
+      "code": "2030",
+      "name": "Withholding tax payable",
+      "currency": "LAK",
+      "kind": "liability",
+      "normalBalance": "credit",
+      "openingBalance": 0
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-service-revenue",
+      "organizationId": "org-demo",
+      "kind": "revenue",
+      "name": "ຂາຍການບໍລິການອື່ນໆ",
+      "accountingCode": "708",
+      "accountId": "acc-income-service",
+      "enabled": true
+    },
+    {
+      "id": "cat-product-revenue",
+      "organizationId": "org-demo",
+      "kind": "revenue",
+      "name": "ຂາຍສິນຄ້າ",
+      "accountingCode": "707",
+      "accountId": "acc-income-product",
+      "enabled": true
+    },
+    {
+      "id": "cat-admin-expense",
+      "organizationId": "org-demo",
+      "kind": "payment",
+      "name": "ຄ່າໃຊ້ຈ່າຍທົ່ວໄປແລະການບໍລິຫານ",
+      "accountingCode": "606.1",
+      "accountId": "acc-expense-admin",
+      "enabled": true
+    },
+    {
+      "id": "cat-sales-document",
+      "organizationId": "org-demo",
+      "kind": "sales",
+      "name": "ຂາຍການບໍລິການອື່ນໆ",
+      "accountingCode": "708",
+      "accountId": "acc-income-service",
+      "enabled": true
+    },
+    {
+      "id": "cat-purchase-document",
+      "organizationId": "org-demo",
+      "kind": "purchase",
+      "name": "ຄ່າໃຊ້ຈ່າຍທົ່ວໄປແລະການບໍລິຫານ",
+      "accountingCode": "606.1",
+      "accountId": "acc-expense-admin",
+      "enabled": true
+    }
+  ],
+  "taxes": [
+    {
+      "id": "tax-exempt",
+      "organizationId": "org-demo",
+      "name": "ຍົກເວັ້ນອາກອນ",
+      "rate": 0,
+      "enabled": true
+    },
+    {
+      "id": "tax-vat",
+      "organizationId": "org-demo",
+      "name": "VAT",
+      "rate": 10,
+      "enabled": true
+    },
+    {
+      "id": "tax-none",
+      "organizationId": "org-demo",
+      "name": "No tax",
+      "rate": 0,
+      "enabled": true
+    }
+  ],
+  "products": [
+    {
+      "id": "product-service-consulting",
+      "organizationId": "org-demo",
+      "code": "SERV-001",
+      "name": "CODEX_TEST Consulting service",
+      "unit": "service",
+      "unitPrice": 800,
+      "taxId": "tax-vat",
+      "enabled": true
+    },
+    {
+      "id": "product-office-supply",
+      "organizationId": "org-demo",
+      "code": "SUP-001",
+      "name": "CODEX_TEST Office supply",
+      "unit": "piece",
+      "unitPrice": 250,
+      "taxId": "tax-none",
+      "enabled": true
+    }
+  ],
+  "tags": [
+    {
+      "id": "tag-important",
+      "organizationId": "org-demo",
+      "name": "CODEX_TEST Important",
+      "color": "#24745a",
+      "enabled": true
+    },
+    {
+      "id": "tag-recurring",
+      "organizationId": "org-demo",
+      "name": "CODEX_TEST Recurring",
+      "color": "#b7791f",
+      "enabled": true
+    }
+  ],
+  "attachments": [],
+  "contacts": [
+    {
+      "id": "contact-general-vendor",
+      "organizationId": "org-demo",
+      "type": "vendor",
+      "name": "General Vendor",
+      "code": "VEN-001",
+      "currency": "LAK",
+      "enabled": true
+    },
+    {
+      "id": "contact-demo-customer",
+      "organizationId": "org-demo",
+      "type": "customer",
+      "name": "CODEX_TEST Customer",
+      "code": "CODEX_TEST_CUST_001",
+      "email": "codex-test-customer@example.invalid",
+      "currency": "LAK",
+      "enabled": true
+    }
+  ],
+  "cashTransactions": [],
+  "documents": [],
+  "journalEntries": [],
+  "savedReportFilters": [],
+  "auditLogs": [
+    {
+      "id": "audit-seed",
+      "organizationId": "org-demo",
+      "actorType": "system",
+      "action": "seed.loaded",
+      "risk": "low",
+      "targetType": "workspace",
+      "targetId": "org-demo",
+      "summary": "Loaded Phase 1 localhost seed data.",
+      "createdAt": "2026-06-24T06:00:00.000Z"
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+[
+  {
+    "key": "cash_revenue.create",
+    "permission": "cash_revenue:create",
+    "risk": "medium",
+    "requiresConfirmation": false,
+    "dryRunAvailable": true
+  },
+  {
+    "key": "cash_payment.create",
+    "permission": "cash_payment:create",
+    "risk": "medium",
+    "requiresConfirmation": false,
+    "dryRunAvailable": true
+  },
+  {
+    "key": "customer.create",
+    "permission": "customer:create",
+    "risk": "medium",
+    "requiresConfirmation": false,
+    "dryRunAvailable": true
+  },
+  {
+    "key": "vendor.create",
+    "permission": "vendor:create",
+    "risk": "medium",
+    "requiresConfirmation": false,
+    "dryRunAvailable": true
+  },
+  {
+    "key": "product.create",
+    "permission": "product:create",
+    "risk": "medium",
+    "requiresConfirmation": false,
+    "dryRunAvailable": true
+  },
+  {
+    "key": "category.create",
+    "permission": "category:create",
+    "risk": "medium",
+    "requiresConfirmation": false,
+    "dryRunAvailable": true
+  },
+  {
+    "key": "sales_document.create",
+    "permission": "invoice:create",
+    "risk": "medium",
+    "requiresConfirmation": false,
+    "dryRunAvailable": true
+  },
+  {
+    "key": "purchase_document.create",
+    "permission": "bill:create",
+    "risk": "medium",
+    "requiresConfirmation": false,
+    "dryRunAvailable": true
+  },
+  {
+    "key": "sales_document.status.update",
+    "permission": "invoice:update_status",
+    "risk": "medium",
+    "requiresConfirmation": false,
+    "dryRunAvailable": true
+  },
+  {
+    "key": "purchase_document.status.update",
+    "permission": "bill:update_status",
+    "risk": "medium",
+    "requiresConfirmation": false,
+    "dryRunAvailable": true
+  },
+  {
+    "key": "document.email.send",
+    "permission": "document:send_email",
+    "risk": "high",
+    "requiresConfirmation": true,
+    "dryRunAvailable": true
+  },
+  {
+    "key": "record.delete",
+    "permission": "record:delete",
+    "risk": "high",
+    "requiresConfirmation": true,
+    "dryRunAvailable": true
+  },
+  {
+    "key": "document.lock",
+    "permission": "document:lock",
+    "risk": "high",
+    "requiresConfirmation": true,
+    "dryRunAvailable": false
+  },
+  {
+    "key": "report.view",
+    "permission": "report:view",
+    "risk": "low",
+    "requiresConfirmation": false,
+    "dryRunAvailable": true
+  },
+  {
+    "key": "report.filter.save",
+    "permission": "report_filter:save",
+    "risk": "low",
+    "requiresConfirmation": false,
+    "dryRunAvailable": true
+  },
+  {
+    "key": "report.filter.delete",
+    "permission": "report_filter:delete",
+    "risk": "medium",
+    "requiresConfirmation": true,
+    "dryRunAvailable": true
+  }
+]
