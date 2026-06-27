@@ -225,6 +225,9 @@ button:disabled {
 }
 
 .page-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 220px;
 }
 
@@ -232,6 +235,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .nav-dropdown,
@@ -579,6 +583,10 @@ p {
 
 .icon-button:hover {
   border-color: var(--hover-border);
+}
+
+.back-button {
+  flex: 0 0 auto;
 }
 
 .icon-button.danger {

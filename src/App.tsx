@@ -1,8 +1,9 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3,
   Bot,
   Building2,
+  ChevronLeft,
   FileDown,
   FileText,
   Download,
@@ -72,6 +73,11 @@ type AppStateShape = AppState;
 type AttachmentApi = ReturnType<typeof useAccountingState>['attachmentApi'];
 type ActivityEntry = AppState['cashTransactions'][number] | AppState['documents'][number];
 type ThemeMode = 'light' | 'dark';
+type FormNavigationProps = {
+  backRequest: number;
+  formView: View;
+  onFormVisibilityChange: (view: View, isOpen: boolean) => void;
+};
 const currencies: CurrencyCode[] = ['LAK', 'THB', 'USD'];
 const categoryKinds: Array<CashTransactionKind | DocumentKind> = ['revenue', 'payment', 'sales', 'purchase'];
 const reportKeys: ReportKey[] = [
@@ -402,6 +408,11 @@ export function App() {
   const [theme, setTheme] = useState<ThemeMode>(initialThemeMode);
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [isSystemOpen, setIsSystemOpen] = useState(false);
+  const [viewHistory, setViewHistory] = useState<View[]>([]);
+  const [activeFormView, setActiveFormView] = useState<View | null>(null);
+  const [backRequest, setBackRequest] = useState(0);
+  const navMenuRef = useRef<HTMLDetailsElement>(null);
+  const systemMenuRef = useRef<HTMLDetailsElement>(null);
   const t = useMemo(() => makeTranslator(locale), [locale]);
   const summary = dashboardSummary(state);
   const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -409,19 +420,74 @@ export function App() {
   const isHostedSession = authSession.mode === 'supabase';
   const currentNavItem = navItems.find((item) => item.view === view) ?? { view: 'dashboard' as View, icon: LayoutDashboard, labelKey: 'dashboard' };
   const CurrentNavIcon = currentNavItem.icon;
+  const canGoBack = activeFormView === view || view !== 'dashboard' || viewHistory.length > 0;
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem('accounting-system-theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    function closeFloatingMenus(event: PointerEvent | WheelEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (isNavOpen && navMenuRef.current && !navMenuRef.current.contains(target)) setIsNavOpen(false);
+      if (isSystemOpen && systemMenuRef.current && !systemMenuRef.current.contains(target)) setIsSystemOpen(false);
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      setIsNavOpen(false);
+      setIsSystemOpen(false);
+    }
+
+    document.addEventListener('pointerdown', closeFloatingMenus);
+    document.addEventListener('wheel', closeFloatingMenus, { passive: true });
+    document.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      document.removeEventListener('pointerdown', closeFloatingMenus);
+      document.removeEventListener('wheel', closeFloatingMenus);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [isNavOpen, isSystemOpen]);
+
+  const handleFormVisibilityChange = useCallback((formView: View, isOpen: boolean) => {
+    setActiveFormView((current) => {
+      if (isOpen) return formView;
+      return current === formView ? null : current;
+    });
+  }, []);
+
+  function navigateToView(nextView: View) {
+    setIsNavOpen(false);
+    setIsSystemOpen(false);
+    if (nextView === view) return;
+    setActiveFormView(null);
+    setViewHistory((history) => [...history, view].slice(-12));
+    setView(nextView);
+  }
+
+  function goBack() {
+    setIsNavOpen(false);
+    setIsSystemOpen(false);
+    if (activeFormView === view) {
+      setBackRequest((request) => request + 1);
+      return;
+    }
+
+    const previousView = viewHistory[viewHistory.length - 1] ?? 'dashboard';
+    setViewHistory((history) => history.slice(0, -1));
+    setView(previousView);
+  }
+
   return (
     <div className="app-shell" data-locale={locale} data-theme={theme} lang={locale}>
       <main className="workspace">
         <header className="topbar">
           <div className="topbar-primary">
-            <details className="nav-dropdown" open={isNavOpen} onToggle={(event) => setIsNavOpen(event.currentTarget.open)}>
-              <summary className="nav-menu-trigger" aria-label={t('primaryNavigation')}>
+            <details ref={navMenuRef} className="nav-dropdown" open={isNavOpen} onToggle={(event) => setIsNavOpen(event.currentTarget.open)}>
+              <summary className="nav-menu-trigger" aria-label={t('primaryNavigation')} onClick={() => setIsSystemOpen(false)}>
                 <Menu size={18} />
                 <span>{t(currentNavItem.labelKey)}</span>
               </summary>
@@ -436,7 +502,7 @@ export function App() {
                           key={item.view}
                           className={view === item.view ? 'nav-item active' : 'nav-item'}
                           onClick={() => {
-                            setView(item.view);
+                            navigateToView(item.view);
                             setIsNavOpen(false);
                           }}
                           type="button"
@@ -460,6 +526,11 @@ export function App() {
             </div>
 
             <div className="page-heading">
+              {canGoBack ? (
+                <button className="icon-button back-button" type="button" onClick={goBack} title={t('goBack')} aria-label={t('goBack')}>
+                  <ChevronLeft size={19} />
+                </button>
+              ) : null}
               <h1>
                 <CurrentNavIcon size={22} />
                 {t(currentNavItem.labelKey)}
@@ -467,11 +538,12 @@ export function App() {
             </div>
           </div>
           <div className="topbar-actions">
-            <details className="system-menu" open={isSystemOpen} onToggle={(event) => setIsSystemOpen(event.currentTarget.open)}>
+            <details ref={systemMenuRef} className="system-menu" open={isSystemOpen} onToggle={(event) => setIsSystemOpen(event.currentTarget.open)}>
               <summary
                 className={authSession.isRequired ? 'icon-button system-trigger required' : 'icon-button system-trigger'}
                 title={t('settings')}
                 aria-label={t('settings')}
+                onClick={() => setIsNavOpen(false)}
               >
                 <Settings size={18} />
               </summary>
@@ -565,17 +637,79 @@ export function App() {
           </div>
         ) : null}
 
-        {view === 'dashboard' && <Dashboard locale={locale} t={t} summary={summary} state={state} setView={setView} />}
-        {view === 'revenue' && <CashModule locale={locale} kind="revenue" t={t} state={state} onAction={runAction} />}
-        {view === 'payment' && <CashModule locale={locale} kind="payment" t={t} state={state} onAction={runAction} />}
+        {view === 'dashboard' && <Dashboard locale={locale} t={t} summary={summary} state={state} setView={navigateToView} />}
+        {view === 'revenue' && (
+          <CashModule
+            locale={locale}
+            kind="revenue"
+            t={t}
+            state={state}
+            onAction={runAction}
+            formView="revenue"
+            backRequest={backRequest}
+            onFormVisibilityChange={handleFormVisibilityChange}
+          />
+        )}
+        {view === 'payment' && (
+          <CashModule
+            locale={locale}
+            kind="payment"
+            t={t}
+            state={state}
+            onAction={runAction}
+            formView="payment"
+            backRequest={backRequest}
+            onFormVisibilityChange={handleFormVisibilityChange}
+          />
+        )}
         {view === 'invoices' && (
-          <DocumentModule locale={locale} kind="sales" t={t} state={state} onAction={runAction} attachmentApi={attachmentApi} />
+          <DocumentModule
+            locale={locale}
+            kind="sales"
+            t={t}
+            state={state}
+            onAction={runAction}
+            attachmentApi={attachmentApi}
+            formView="invoices"
+            backRequest={backRequest}
+            onFormVisibilityChange={handleFormVisibilityChange}
+          />
         )}
         {view === 'bills' && (
-          <DocumentModule locale={locale} kind="purchase" t={t} state={state} onAction={runAction} attachmentApi={attachmentApi} />
+          <DocumentModule
+            locale={locale}
+            kind="purchase"
+            t={t}
+            state={state}
+            onAction={runAction}
+            attachmentApi={attachmentApi}
+            formView="bills"
+            backRequest={backRequest}
+            onFormVisibilityChange={handleFormVisibilityChange}
+          />
         )}
-        {view === 'categories' && <CategoryModule locale={locale} t={t} state={state} onAction={runAction} />}
-        {view === 'products' && <ProductModule locale={locale} t={t} state={state} onAction={runAction} />}
+        {view === 'categories' && (
+          <CategoryModule
+            locale={locale}
+            t={t}
+            state={state}
+            onAction={runAction}
+            formView="categories"
+            backRequest={backRequest}
+            onFormVisibilityChange={handleFormVisibilityChange}
+          />
+        )}
+        {view === 'products' && (
+          <ProductModule
+            locale={locale}
+            t={t}
+            state={state}
+            onAction={runAction}
+            formView="products"
+            backRequest={backRequest}
+            onFormVisibilityChange={handleFormVisibilityChange}
+          />
+        )}
         {view === 'journals' && <Journals locale={locale} t={t} state={state} />}
         {view === 'reports' && <Reports locale={locale} t={t} state={state} onAction={runAction} />}
         {view === 'actions' && <ActionContracts t={t} />}
@@ -869,13 +1003,16 @@ function CashModule({
   t,
   state,
   onAction,
+  backRequest,
+  formView,
+  onFormVisibilityChange,
 }: {
   locale: Locale;
   kind: CashTransactionKind;
   t: Translator;
   state: AppStateShape;
   onAction: (request: AccountingActionRequest) => Promise<AccountingActionResult>;
-}) {
+} & FormNavigationProps) {
   const defaultCategory = state.categories.find((category) => category.kind === kind)?.id ?? '';
   const defaultAccount = state.accounts.find((account) => account.id === 'acc-cash-lak')?.id ?? state.accounts[0]?.id ?? '';
   const defaultContact = state.contacts.find((contact) => contact.type === (kind === 'revenue' ? 'customer' : 'vendor'))?.id ?? '';
@@ -902,6 +1039,15 @@ function CashModule({
   const taggedCount = rows.filter((entry) => entry.tagIds.length > 0).length;
   const cashAccounts = state.accounts.filter((account) => account.kind === 'cash' || account.kind === 'bank');
   const cashAccountOptions = cashAccounts.filter((account) => account.currency === cashCurrency);
+
+  useEffect(() => {
+    onFormVisibilityChange(formView, showCreate);
+    return () => onFormVisibilityChange(formView, false);
+  }, [formView, onFormVisibilityChange, showCreate]);
+
+  useEffect(() => {
+    if (backRequest > 0 && showCreate) setShowCreate(false);
+  }, [backRequest, showCreate]);
 
   function handleCashCurrencyChange(value: string) {
     const currency = value as CurrencyCode;
@@ -1035,6 +1181,9 @@ function DocumentModule({
   state,
   onAction,
   attachmentApi,
+  backRequest,
+  formView,
+  onFormVisibilityChange,
 }: {
   locale: Locale;
   kind: DocumentKind;
@@ -1042,7 +1191,7 @@ function DocumentModule({
   state: AppStateShape;
   onAction: (request: AccountingActionRequest) => Promise<AccountingActionResult>;
   attachmentApi: AttachmentApi;
-}) {
+} & FormNavigationProps) {
   const contactType = kind === 'sales' ? 'customer' : 'vendor';
   const defaultContact = state.contacts.find((contact) => contact.type === contactType)?.id ?? '';
   const defaultDocumentCurrency = state.contacts.find((contact) => contact.id === defaultContact)?.currency ?? state.organization.baseCurrency;
@@ -1090,6 +1239,15 @@ function DocumentModule({
   const openCount = rows.filter((entry) => !entry.locked && entry.status !== 'receipt' && entry.status !== 'paid').length;
   const lockedCount = rows.filter((entry) => entry.locked).length;
   const amountTotals = currencyTotals(rows, (entry) => calculateItemsTotal(entry.items), (entry) => entry.currency);
+
+  useEffect(() => {
+    onFormVisibilityChange(formView, showCreate);
+    return () => onFormVisibilityChange(formView, false);
+  }, [formView, onFormVisibilityChange, showCreate]);
+
+  useEffect(() => {
+    if (backRequest > 0 && showCreate) setShowCreate(false);
+  }, [backRequest, showCreate]);
 
   function handleDocumentContactChange(value: string) {
     setContactId(value);
@@ -1770,12 +1928,15 @@ function CategoryModule({
   t,
   state,
   onAction,
+  backRequest,
+  formView,
+  onFormVisibilityChange,
 }: {
   locale: Locale;
   t: Translator;
   state: AppStateShape;
   onAction: (request: AccountingActionRequest) => Promise<AccountingActionResult>;
-}) {
+} & FormNavigationProps) {
   const [kind, setKind] = useState<CashTransactionKind | DocumentKind>('revenue');
   const [name, setName] = useState('');
   const [accountingCode, setAccountingCode] = useState('');
@@ -1785,6 +1946,15 @@ function CategoryModule({
   const revenueCategoryCount = state.categories.filter((category) => category.kind === 'revenue' || category.kind === 'sales').length;
   const paymentCategoryCount = state.categories.filter((category) => category.kind === 'payment' || category.kind === 'purchase').length;
   const categoryAccountCount = new Set(state.categories.map((category) => category.accountId)).size;
+
+  useEffect(() => {
+    onFormVisibilityChange(formView, showCreate);
+    return () => onFormVisibilityChange(formView, false);
+  }, [formView, onFormVisibilityChange, showCreate]);
+
+  useEffect(() => {
+    if (backRequest > 0 && showCreate) setShowCreate(false);
+  }, [backRequest, showCreate]);
 
   function changeKind(nextKind: string) {
     const categoryKind = nextKind as CashTransactionKind | DocumentKind;
@@ -1862,12 +2032,15 @@ function ProductModule({
   t,
   state,
   onAction,
+  backRequest,
+  formView,
+  onFormVisibilityChange,
 }: {
   locale: Locale;
   t: Translator;
   state: AppStateShape;
   onAction: (request: AccountingActionRequest) => Promise<AccountingActionResult>;
-}) {
+} & FormNavigationProps) {
   const defaultTaxId = (state.taxes ?? []).find((tax) => tax.id === 'tax-none')?.id ?? state.taxes[0]?.id ?? '';
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
@@ -1880,6 +2053,15 @@ function ProductModule({
   const taxedCount = products.filter((product) => product.taxId && product.taxId !== 'tax-none').length;
   const productUnitCount = new Set(products.map((product) => product.unit)).size;
   const averagePrice = products.length ? products.reduce((total, product) => total + product.unitPrice, 0) / products.length : 0;
+
+  useEffect(() => {
+    onFormVisibilityChange(formView, showCreate);
+    return () => onFormVisibilityChange(formView, false);
+  }, [formView, onFormVisibilityChange, showCreate]);
+
+  useEffect(() => {
+    if (backRequest > 0 && showCreate) setShowCreate(false);
+  }, [backRequest, showCreate]);
 
   async function submit() {
     const result = await onAction({
