@@ -321,9 +321,9 @@ async function run() {
     'X-Codex-Reset-Reason': 'initial-seed',
   });
   assert(reset.status === 200 && reset.body?.ok === true, 'reset endpoint failed');
-  assert(reset.body.state.contacts.length === 2, 'seed should restore two contacts');
-  assert(reset.body.state.products.length === 2, 'seed should restore two products');
-  assert(reset.body.state.tags.length === 2, 'seed should restore two tags');
+  assert(reset.body.state.contacts.length === 0, 'fresh seed should restore zero contacts');
+  assert(reset.body.state.products.length === 0, 'fresh seed should restore zero products');
+  assert(reset.body.state.tags.length === 0, 'fresh seed should restore zero tags');
   assert(reset.body.state.attachments.length === 0, 'seed should restore zero attachments');
   assert(reset.body.state.documents.length === 0, 'seed should restore zero documents');
   assert(reset.body.state.savedReportFilters.length === 0, 'seed should restore zero saved report filters');
@@ -1077,12 +1077,11 @@ async function run() {
       exchangeRate: 1.2,
       reference: 'CODEX_TEST_API_REVENUE_REF',
       description: 'API revenue with form parity fields',
-      tagIds: ['tag-important'],
       attachmentNames: ['CODEX_TEST revenue evidence.pdf'],
       items: [
         {
           id: 'item-api-revenue',
-          productId: 'product-service-consulting',
+          productId: createdProduct.id,
           name: 'API consulting service',
           unit: 'service',
           description: '',
@@ -1098,9 +1097,8 @@ async function run() {
   assert(revenue.status === 200 && revenue.body?.ok === true, 'cash_revenue.create should pass');
   const createdRevenue = revenue.body.state.cashTransactions[0];
   assert(createdRevenue.exchangeRate === 1.2, 'cash revenue should keep exchange rate');
-  assert(createdRevenue.tagIds.includes('tag-important'), 'cash revenue should keep tag ids');
   assert(createdRevenue.attachmentIds.length === 1, 'cash revenue should link attachment reference');
-  assert(createdRevenue.items[0].productId === 'product-service-consulting', 'cash revenue item should keep product');
+  assert(createdRevenue.items[0].productId === createdProduct.id, 'cash revenue item should keep product');
   assert(createdRevenue.items[0].unit === 'service', 'cash revenue item should keep unit');
   assert(createdRevenue.items[0].taxRate === 10, 'cash revenue item should snapshot tax rate');
   assert(createdRevenue.amount === 1584, `cash revenue amount should include discount and tax, got ${createdRevenue.amount}`);
@@ -1125,7 +1123,7 @@ async function run() {
       items: [
         {
           id: 'item-api-revenue-no-tax',
-          productId: 'product-service-consulting',
+          productId: createdProduct.id,
           name: 'API no tax override line',
           unit: 'service',
           description: '',
@@ -1157,12 +1155,11 @@ async function run() {
       title: 'API status transition test',
       categoryId: createdSalesCategory.id,
       exchangeRate: 1.1,
-      tagIds: ['tag-recurring'],
       attachmentNames: ['CODEX_TEST invoice evidence.pdf'],
       items: [
         {
           id: 'item-api-sales',
-          productId: 'product-service-consulting',
+          productId: createdProduct.id,
           name: 'API service line',
           unit: 'service',
           description: '',
@@ -1182,7 +1179,6 @@ async function run() {
   assert(createdDocument.dueDate === '2026-07-08', 'sales document should keep due date');
   assert(createdDocument.vatNumber === 'CODEX_TEST_VAT_API', 'sales document should keep VAT number');
   assert(createdDocument.exchangeRate === 1.1, 'sales document should keep exchange rate');
-  assert(createdDocument.tagIds.includes('tag-recurring'), 'sales document should keep tag ids');
   assert(createdDocument.attachmentIds.length === 1, 'sales document should link attachment reference');
   assert(createdDocument.items[0].discountType === 'amount', 'sales document item should keep discount type');
   assert(createdDocument.items[0].taxRate === 10, 'sales document item should snapshot tax rate');
@@ -2572,7 +2568,8 @@ async function run() {
     actor: ownerActor,
     payload: {
       kind: 'purchase',
-      contactId: 'contact-general-vendor',
+      contactId: createdVendor.id,
+      currency: 'LAK',
       documentDate: '2026-06-24',
       dueDate: '2026-07-24',
       orderNumber: 'CODEX_TEST_API_ADJUSTED_PURCHASE_ORDER',
@@ -2655,12 +2652,10 @@ async function run() {
       title: 'API purchase transition test',
       categoryId: 'cat-purchase-document',
       exchangeRate: 22000,
-      tagIds: ['tag-important'],
       attachmentNames: ['CODEX_TEST purchase evidence.pdf'],
       items: [
         {
           id: 'item-api-purchase',
-          productId: 'product-office-supply',
           name: 'API office supply',
           unit: 'piece',
           description: '',

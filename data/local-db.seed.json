@@ -1,7 +1,7 @@
 {
   "organization": {
     "id": "org-demo",
-    "name": "Thipphavanhtik",
+    "name": "Account for you",
     "baseCurrency": "LAK"
   },
   "accounts": [
@@ -196,81 +196,13 @@
       "enabled": true
     }
   ],
-  "products": [
-    {
-      "id": "product-service-consulting",
-      "organizationId": "org-demo",
-      "code": "SERV-001",
-      "name": "CODEX_TEST Consulting service",
-      "unit": "service",
-      "unitPrice": 800,
-      "taxId": "tax-vat",
-      "enabled": true
-    },
-    {
-      "id": "product-office-supply",
-      "organizationId": "org-demo",
-      "code": "SUP-001",
-      "name": "CODEX_TEST Office supply",
-      "unit": "piece",
-      "unitPrice": 250,
-      "taxId": "tax-none",
-      "enabled": true
-    }
-  ],
-  "tags": [
-    {
-      "id": "tag-important",
-      "organizationId": "org-demo",
-      "name": "CODEX_TEST Important",
-      "color": "#24745a",
-      "enabled": true
-    },
-    {
-      "id": "tag-recurring",
-      "organizationId": "org-demo",
-      "name": "CODEX_TEST Recurring",
-      "color": "#b7791f",
-      "enabled": true
-    }
-  ],
+  "products": [],
+  "tags": [],
   "attachments": [],
-  "contacts": [
-    {
-      "id": "contact-general-vendor",
-      "organizationId": "org-demo",
-      "type": "vendor",
-      "name": "General Vendor",
-      "code": "VEN-001",
-      "currency": "LAK",
-      "enabled": true
-    },
-    {
-      "id": "contact-demo-customer",
-      "organizationId": "org-demo",
-      "type": "customer",
-      "name": "CODEX_TEST Customer",
-      "code": "CODEX_TEST_CUST_001",
-      "email": "codex-test-customer@example.invalid",
-      "currency": "LAK",
-      "enabled": true
-    }
-  ],
+  "contacts": [],
   "cashTransactions": [],
   "documents": [],
   "journalEntries": [],
   "savedReportFilters": [],
-  "auditLogs": [
-    {
-      "id": "audit-seed",
-      "organizationId": "org-demo",
-      "actorType": "system",
-      "action": "seed.loaded",
-      "risk": "low",
-      "targetType": "workspace",
-      "targetId": "org-demo",
-      "summary": "Loaded Phase 1 localhost seed data.",
-      "createdAt": "2026-06-24T06:00:00.000Z"
-    }
-  ]
+  "auditLogs": []
 }

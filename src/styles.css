@@ -418,6 +418,41 @@ p {
   line-height: 1.35;
 }
 
+.settings-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(150px, auto);
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 8px;
+}
+
+.settings-row-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.settings-row-label svg {
+  color: var(--accent);
+  flex: 0 0 auto;
+}
+
+.settings-row select {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--ink);
+  padding: 0 10px;
+}
+
 .session-panel {
   display: grid;
   grid-template-columns: minmax(140px, 1fr) auto auto;
@@ -523,6 +558,12 @@ p {
   border: 0;
   min-height: 32px;
   padding: 0 4px;
+}
+
+.field input::placeholder,
+.session-panel input::placeholder {
+  color: var(--muted);
+  opacity: 0.58;
 }
 
 .icon-button {

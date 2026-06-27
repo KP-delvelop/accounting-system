@@ -8,7 +8,7 @@ import {
 } from './supabase-demo-utils.mjs';
 
 const organizationId = '00000000-0000-4000-8000-000000000001';
-const organizationName = 'Bansi Local Demo';
+const organizationName = 'Account for you';
 
 const demoUsers = [
   { roleKey: 'owner', email: 'demo.owner.01@example.invalid', displayName: 'Demo Owner' },

@@ -49,7 +49,6 @@ import {
 } from './domain';
 import { humanOwnerActor } from './actions';
 import { locales, makeTranslator } from './i18n';
-import { dataMode, persistenceLayer } from './runtimeMode';
 import { useAccountingState } from './store';
 import type { AccountingActionRequest, AccountingActionResult } from './actions';
 import type {
@@ -356,27 +355,21 @@ function defaultCategoryAccountId(state: AppStateShape, categoryKind: CashTransa
   return accountsForCategoryKind(state, categoryKind)[0]?.id ?? '';
 }
 
-function defaultCategoryName(categoryKind: CashTransactionKind | DocumentKind) {
-  if (categoryKind === 'revenue') return 'CODEX_TEST Quick Revenue Category';
-  if (categoryKind === 'payment') return 'CODEX_TEST Quick Payment Category';
-  if (categoryKind === 'sales') return 'CODEX_TEST Quick Sales Category';
-  return 'CODEX_TEST Quick Purchase Category';
+function defaultCategoryName(_categoryKind: CashTransactionKind | DocumentKind) {
+  return '';
 }
 
-function defaultCategoryCode(categoryKind: CashTransactionKind | DocumentKind) {
-  const prefix =
-    categoryKind === 'revenue'
-      ? 'REV'
-      : categoryKind === 'payment'
-        ? 'PAY'
-        : categoryKind === 'sales'
-          ? 'SALES'
-          : 'PURCHASE';
-  return `CODEX_TEST_${prefix}_${Date.now().toString().slice(-5)}`;
+function defaultCategoryCode(_categoryKind: CashTransactionKind | DocumentKind) {
+  return '';
 }
 
 function defaultProductCode() {
-  return `CODEX_TEST_PRODUCT_${Date.now().toString().slice(-5)}`;
+  return '';
+}
+
+function generatedContactCode(contactType: 'customer' | 'vendor') {
+  const prefix = contactType === 'customer' ? 'CUST' : 'VEN';
+  return `${prefix}-${Date.now().toString().slice(-5)}`;
 }
 
 function reportKeyLabel(t: Translator, reportKey: ReportKey) {
@@ -402,7 +395,7 @@ function sessionErrorLabel(t: Translator, code?: string, fallback?: string | nul
 }
 
 export function App() {
-  const { state, runAction, reset, storageMode, authSession, attachmentApi } = useAccountingState();
+  const { state, runAction, reset, authSession, attachmentApi } = useAccountingState();
   const [locale, setLocale] = useState<Locale>('th');
   const [view, setView] = useState<View>('dashboard');
   const [sessionTokenDraft, setSessionTokenDraft] = useState(authSession.token);
@@ -411,7 +404,6 @@ export function App() {
   const [isSystemOpen, setIsSystemOpen] = useState(false);
   const t = useMemo(() => makeTranslator(locale), [locale]);
   const summary = dashboardSummary(state);
-  const storageLabel = storageMode === 'localhost-api' ? t('localhostDatabase') : t('browserFallback');
   const nextTheme = theme === 'dark' ? 'light' : 'dark';
   const authErrorLabel = authSession.error ? sessionErrorLabel(t, authSession.errorCode ?? undefined, authSession.error ?? undefined) : null;
   const isHostedSession = authSession.mode === 'supabase';
@@ -472,62 +464,63 @@ export function App() {
                 <CurrentNavIcon size={22} />
                 {t(currentNavItem.labelKey)}
               </h1>
-              <p>{t('phaseTagline')}</p>
             </div>
           </div>
           <div className="topbar-actions">
-            <label className="locale-control">
-              <Languages size={16} />
-              <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
-                {locales.map((entry) => (
-                  <option key={entry} value={entry}>
-                    {entry.toUpperCase()}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              className="icon-button theme-toggle"
-              type="button"
-              onClick={() => setTheme(nextTheme)}
-              title={nextTheme === 'dark' ? t('switchToDarkMode') : t('switchToLightMode')}
-              aria-label={nextTheme === 'dark' ? t('switchToDarkMode') : t('switchToLightMode')}
-            >
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
             <details className="system-menu" open={isSystemOpen} onToggle={(event) => setIsSystemOpen(event.currentTarget.open)}>
               <summary
                 className={authSession.isRequired ? 'icon-button system-trigger required' : 'icon-button system-trigger'}
-                title={authSession.isRequired ? t('authRequired') : t('localSessionStub')}
-                aria-label={authSession.isRequired ? t('authRequired') : t('localSessionStub')}
+                title={t('settings')}
+                aria-label={t('settings')}
               >
                 <Settings size={18} />
               </summary>
               <div className="system-menu-panel">
-                <div className="system-menu-header">
-                  <ShieldCheck size={18} />
-                  <div>
-                    <strong>{isHostedSession ? 'Supabase session' : authSession.isRequired ? t('authRequired') : t('localSessionStub')}</strong>
-                    <span>
-                      {isHostedSession
-                        ? `${authSession.userLabel || 'Hosted user'}${authSession.roleKey ? ` · ${authSession.roleKey}` : ''}`
-                        : authSession.isRequired ? t('authRequiredHint') : t('localSessionStubHint')}
-                    </span>
+                <div className="settings-row">
+                  <div className="settings-row-label">
+                    <Languages size={17} />
+                    <span>{t('language')}</span>
                   </div>
+                  <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
+                    {locales.map((entry) => (
+                      <option key={entry} value={entry}>
+                        {entry.toUpperCase()}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <span className="pill ok" title={`${dataMode}: ${storageMode}; fallback: ${persistenceLayer}`}>
-                  {storageLabel}
-                </span>
+                <div className="settings-row">
+                  <div className="settings-row-label">
+                    {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+                    <span>{t('appearance')}</span>
+                  </div>
+                  <button
+                    className="secondary-action compact"
+                    type="button"
+                    onClick={() => setTheme(nextTheme)}
+                    title={nextTheme === 'dark' ? t('switchToDarkMode') : t('switchToLightMode')}
+                    aria-label={nextTheme === 'dark' ? t('switchToDarkMode') : t('switchToLightMode')}
+                  >
+                    {nextTheme === 'dark' ? t('switchToDarkMode') : t('switchToLightMode')}
+                  </button>
+                </div>
                 {isHostedSession ? (
                   <button
                     className="secondary-action compact"
                     type="button"
                     onClick={() => void authSession.logout()}
                   >
-                    Logout
+                    {t('logout')}
                   </button>
                 ) : (
                   <>
+                    <div className="system-menu-header">
+                      <ShieldCheck size={18} />
+                      <div>
+                        <strong>{authSession.isRequired ? t('authRequired') : t('localSessionStub')}</strong>
+                        <span>{authSession.isRequired ? t('authRequiredHint') : t('localSessionStubHint')}</span>
+                      </div>
+                    </div>
                     <div className={authSession.isRequired ? 'session-panel required' : 'session-panel'}>
                       <input
                         aria-label={t('localApiToken')}
@@ -895,12 +888,10 @@ function CashModule({
   const [contactId, setContactId] = useState(defaultContact);
   const [exchangeRate, setExchangeRate] = useState(1);
   const [tagId, setTagId] = useState(defaultTag);
-  const [attachmentName, setAttachmentName] = useState(kind === 'revenue' ? 'CODEX_TEST revenue evidence.pdf' : 'CODEX_TEST payment receipt.pdf');
-  const [reference, setReference] = useState(kind === 'revenue' ? 'CODEX_TEST_REV_PHASE1' : 'CODEX_TEST_PAY_PHASE1');
-  const [description, setDescription] = useState(kind === 'revenue' ? 'CODEX_TEST Phase 1 revenue' : 'CODEX_TEST Phase 1 payment');
-  const [items, setItems] = useState<LineItem[]>(() => [
-    lineFromProduct(state, kind === 'revenue' ? 'CODEX_TEST Service Revenue' : 'CODEX_TEST Admin Expense', kind === 'revenue' ? 1000 : 250),
-  ]);
+  const [attachmentName, setAttachmentName] = useState('');
+  const [reference, setReference] = useState('');
+  const [description, setDescription] = useState('');
+  const [items, setItems] = useState<LineItem[]>(() => [lineFromProduct(state, '', 0)]);
   const [formError, setFormError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const rows = state.cashTransactions.filter((entry) => entry.kind === kind);
@@ -1006,9 +997,9 @@ function CashModule({
             onChange={setTagId}
             options={[{ value: '', label: t('none') }, ...(state.tags ?? []).filter((tag) => tag.enabled).map((tag) => ({ value: tag.id, label: tag.name }))]}
           />
-          <TextField label={t('reference')} value={reference} onChange={setReference} />
-          <TextField label={t('description')} value={description} onChange={setDescription} />
-          <TextField label={t('attachment')} value={attachmentName} onChange={setAttachmentName} />
+          <TextField label={t('reference')} value={reference} onChange={setReference} placeholder={t('referencePlaceholder')} />
+          <TextField label={t('description')} value={description} onChange={setDescription} placeholder={t('descriptionPlaceholder')} />
+          <TextField label={t('attachment')} value={attachmentName} onChange={setAttachmentName} placeholder={t('attachmentPlaceholder')} />
           <LineItemsEditor locale={locale} t={t} state={state} currency={cashCurrency} items={items} onChange={setItems} onAction={onAction} onError={setFormError} />
         </FormPanel>
       ) : null}
@@ -1060,22 +1051,20 @@ function DocumentModule({
   const [contactId, setContactId] = useState(defaultContact);
   const [documentCurrency, setDocumentCurrency] = useState<CurrencyCode>(defaultDocumentCurrency);
   const [categoryId, setCategoryId] = useState(defaultCategory);
-  const [reference, setReference] = useState(kind === 'sales' ? 'CODEX_TEST_INVOICE_PHASE1' : 'CODEX_TEST_BILL_PHASE1');
-  const [title, setTitle] = useState(kind === 'sales' ? 'CODEX_TEST Demo invoice' : 'CODEX_TEST Demo bill');
+  const [reference, setReference] = useState('');
+  const [title, setTitle] = useState('');
   const [dueDate, setDueDate] = useState(addDaysIsoDate(kind === 'sales' ? 14 : 30));
-  const [vatNumber, setVatNumber] = useState(kind === 'sales' ? 'CODEX_TEST_VAT_001' : '');
+  const [vatNumber, setVatNumber] = useState('');
   const [exchangeRate, setExchangeRate] = useState(1);
   const [tagId, setTagId] = useState(defaultTag);
-  const [attachmentName, setAttachmentName] = useState(kind === 'sales' ? 'CODEX_TEST invoice attachment.pdf' : 'CODEX_TEST bill attachment.pdf');
-  const [newContactName, setNewContactName] = useState(kind === 'sales' ? 'CODEX_TEST New Customer' : 'CODEX_TEST New Vendor');
-  const [newContactEmail, setNewContactEmail] = useState(contactType === 'customer' ? 'codex-new-customer@example.invalid' : 'codex-new-vendor@example.invalid');
-  const [newContactPhone, setNewContactPhone] = useState('+856200000000');
-  const [newContactTaxNumber, setNewContactTaxNumber] = useState(contactType === 'customer' ? 'CODEX_TEST_CUST_TAX_AUTO' : 'CODEX_TEST_VENDOR_TAX_AUTO');
+  const [attachmentName, setAttachmentName] = useState('');
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactEmail, setNewContactEmail] = useState('');
+  const [newContactPhone, setNewContactPhone] = useState('');
+  const [newContactTaxNumber, setNewContactTaxNumber] = useState('');
   const [newContactCurrency, setNewContactCurrency] = useState<CurrencyCode>(state.organization.baseCurrency);
-  const [newContactAddress, setNewContactAddress] = useState('CODEX_TEST demo address');
-  const [items, setItems] = useState<LineItem[]>(() => [
-    lineFromProduct(state, kind === 'sales' ? 'CODEX_TEST Invoice Service' : 'CODEX_TEST Bill Service', kind === 'sales' ? 800 : 450),
-  ]);
+  const [newContactAddress, setNewContactAddress] = useState('');
+  const [items, setItems] = useState<LineItem[]>(() => [lineFromProduct(state, '', 0)]);
   const [formError, setFormError] = useState<string | null>(null);
   const [pendingLockId, setPendingLockId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -1213,7 +1202,7 @@ function DocumentModule({
         currency: documentCurrency,
         documentDate: todayIsoDate(),
         dueDate,
-        orderNumber: kind === 'sales' ? 'CODEX_TEST_ORDER_PHASE1' : 'CODEX_TEST_PO_PHASE1',
+        orderNumber: '',
         reference,
         vatNumber,
         title,
@@ -1236,7 +1225,7 @@ function DocumentModule({
       payload: {
         type: contactType,
         name: trimmedName,
-        code: contactType === 'customer' ? 'CODEX_TEST_CUST_AUTO' : 'CODEX_TEST_VENDOR_AUTO',
+        code: generatedContactCode(contactType),
         email: newContactEmail,
         phone: newContactPhone,
         taxNumber: newContactTaxNumber,
@@ -1255,12 +1244,12 @@ function DocumentModule({
       setContactId(created.id);
       setDocumentCurrency(created.currency);
     }
-    setNewContactName(contactType === 'customer' ? 'CODEX_TEST New Customer' : 'CODEX_TEST New Vendor');
-    setNewContactEmail(contactType === 'customer' ? 'codex-new-customer@example.invalid' : 'codex-new-vendor@example.invalid');
-    setNewContactPhone('+856200000000');
-    setNewContactTaxNumber(contactType === 'customer' ? 'CODEX_TEST_CUST_TAX_AUTO' : 'CODEX_TEST_VENDOR_TAX_AUTO');
+    setNewContactName('');
+    setNewContactEmail('');
+    setNewContactPhone('');
+    setNewContactTaxNumber('');
     setNewContactCurrency(state.organization.baseCurrency);
-    setNewContactAddress('CODEX_TEST demo address');
+    setNewContactAddress('');
     setFormError(null);
   }
 
@@ -1435,7 +1424,10 @@ function DocumentModule({
             label={t('contact')}
             value={contactId}
             onChange={handleDocumentContactChange}
-            options={state.contacts.filter((contact) => contact.type === contactType).map((contact) => ({ value: contact.id, label: contact.name }))}
+            options={[
+              { value: '', label: t('none') },
+              ...state.contacts.filter((contact) => contact.type === contactType).map((contact) => ({ value: contact.id, label: contact.name })),
+            ]}
           />
           <SelectField label={t('currency')} value={documentCurrency} onChange={(value) => setDocumentCurrency(value as CurrencyCode)} options={currencyOptions()} />
           <div className="inline-create">
@@ -1444,17 +1436,17 @@ function DocumentModule({
               <span>{contactType === 'customer' ? t('newCustomer') : t('newVendor')}</span>
             </div>
             <div className="inline-create-row">
-              <TextField label={t('name')} value={newContactName} onChange={setNewContactName} />
-              <TextField label={t('email')} value={newContactEmail} onChange={setNewContactEmail} />
-              <TextField label={t('phone')} value={newContactPhone} onChange={setNewContactPhone} />
-              <TextField label={t('taxNumber')} value={newContactTaxNumber} onChange={setNewContactTaxNumber} />
+              <TextField label={t('name')} value={newContactName} onChange={setNewContactName} placeholder={t('contactNamePlaceholder')} />
+              <TextField label={t('email')} value={newContactEmail} onChange={setNewContactEmail} placeholder={t('emailPlaceholder')} />
+              <TextField label={t('phone')} value={newContactPhone} onChange={setNewContactPhone} placeholder={t('phonePlaceholder')} />
+              <TextField label={t('taxNumber')} value={newContactTaxNumber} onChange={setNewContactTaxNumber} placeholder={t('taxNumberPlaceholder')} />
               <SelectField
                 label={t('currency')}
                 value={newContactCurrency}
                 onChange={(value) => setNewContactCurrency(value as CurrencyCode)}
                 options={currencyOptions()}
               />
-              <TextField label={t('address')} value={newContactAddress} onChange={setNewContactAddress} />
+              <TextField label={t('address')} value={newContactAddress} onChange={setNewContactAddress} placeholder={t('addressPlaceholder')} />
               <button className="secondary-action compact" type="button" onClick={() => void createContact()}>
                 <Plus size={16} />
                 {t('create')}
@@ -1478,10 +1470,10 @@ function DocumentModule({
             onCreated={setCategoryId}
             onError={setFormError}
           />
-          <TextField label={t('reference')} value={reference} onChange={setReference} />
-          <TextField label={t('title')} value={title} onChange={setTitle} />
+          <TextField label={t('reference')} value={reference} onChange={setReference} placeholder={t('referencePlaceholder')} />
+          <TextField label={t('title')} value={title} onChange={setTitle} placeholder={t('titlePlaceholder')} />
           <DateField label={t('dueDate')} value={dueDate} onChange={setDueDate} />
-          <TextField label={t('vatNumber')} value={vatNumber} onChange={setVatNumber} />
+          <TextField label={t('vatNumber')} value={vatNumber} onChange={setVatNumber} placeholder={t('vatNumberPlaceholder')} />
           <NumberField label={t('exchangeRate')} value={exchangeRate} min={0.000001} step={0.000001} onChange={setExchangeRate} />
           <SelectField
             label={t('tag')}
@@ -1489,7 +1481,7 @@ function DocumentModule({
             onChange={setTagId}
             options={[{ value: '', label: t('none') }, ...(state.tags ?? []).filter((tag) => tag.enabled).map((tag) => ({ value: tag.id, label: tag.name }))]}
           />
-          <TextField label={t('attachment')} value={attachmentName} onChange={setAttachmentName} />
+          <TextField label={t('attachment')} value={attachmentName} onChange={setAttachmentName} placeholder={t('attachmentPlaceholder')} />
           <LineItemsEditor locale={locale} t={t} state={state} currency={documentCurrency} items={items} onChange={setItems} onAction={onAction} onError={setFormError} />
         </FormPanel>
       ) : null}
@@ -1761,8 +1753,8 @@ function InlineCategoryCreate({
         <span>{t('newCategory')}</span>
       </div>
       <div className="inline-create-row">
-        <TextField label={t('name')} value={name} onChange={setName} />
-        <TextField label={t('accountingCode')} value={accountingCode} onChange={setAccountingCode} />
+        <TextField label={t('name')} value={name} onChange={setName} placeholder={t('categoryNamePlaceholder')} />
+        <TextField label={t('accountingCode')} value={accountingCode} onChange={setAccountingCode} placeholder={t('accountingCodePlaceholder')} />
         <SelectField label={t('account')} value={selectedAccountId} onChange={setAccountId} options={accountOptions} />
         <button className="secondary-action compact" type="button" onClick={() => void createCategoryInline()}>
           <Plus size={16} />
@@ -1785,8 +1777,8 @@ function CategoryModule({
   onAction: (request: AccountingActionRequest) => Promise<AccountingActionResult>;
 }) {
   const [kind, setKind] = useState<CashTransactionKind | DocumentKind>('revenue');
-  const [name, setName] = useState('CODEX_TEST Category from UI');
-  const [accountingCode, setAccountingCode] = useState('CODEX_TEST_900');
+  const [name, setName] = useState('');
+  const [accountingCode, setAccountingCode] = useState('');
   const [accountId, setAccountId] = useState(defaultCategoryAccountId(state, 'revenue'));
   const [formError, setFormError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -1817,8 +1809,8 @@ function CategoryModule({
       return;
     }
 
-    setName('CODEX_TEST Category from UI');
-    setAccountingCode(`CODEX_TEST_${Date.now().toString().slice(-5)}`);
+    setName('');
+    setAccountingCode('');
     setFormError(null);
   }
 
@@ -1844,8 +1836,8 @@ function CategoryModule({
             onChange={changeKind}
             options={categoryKinds.map((categoryKind) => ({ value: categoryKind, label: t(categoryKind) }))}
           />
-          <TextField label={t('name')} value={name} onChange={setName} />
-          <TextField label={t('accountingCode')} value={accountingCode} onChange={setAccountingCode} />
+          <TextField label={t('name')} value={name} onChange={setName} placeholder={t('categoryNamePlaceholder')} />
+          <TextField label={t('accountingCode')} value={accountingCode} onChange={setAccountingCode} placeholder={t('accountingCodePlaceholder')} />
           <SelectField label={t('account')} value={accountId} onChange={setAccountId} options={accountOptionsForCategoryKind(state, kind, locale)} />
         </FormPanel>
       ) : null}
@@ -1877,10 +1869,10 @@ function ProductModule({
   onAction: (request: AccountingActionRequest) => Promise<AccountingActionResult>;
 }) {
   const defaultTaxId = (state.taxes ?? []).find((tax) => tax.id === 'tax-none')?.id ?? state.taxes[0]?.id ?? '';
-  const [code, setCode] = useState('CODEX_TEST_PRODUCT_AUTO');
-  const [name, setName] = useState('CODEX_TEST Product from UI');
-  const [unit, setUnit] = useState('unit');
-  const [unitPrice, setUnitPrice] = useState(100);
+  const [code, setCode] = useState('');
+  const [name, setName] = useState('');
+  const [unit, setUnit] = useState('');
+  const [unitPrice, setUnitPrice] = useState(0);
   const [taxId, setTaxId] = useState(defaultTaxId);
   const [formError, setFormError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -1907,10 +1899,10 @@ function ProductModule({
       return;
     }
 
-    setCode(`CODEX_TEST_PRODUCT_${Date.now().toString().slice(-5)}`);
-    setName('CODEX_TEST Product from UI');
-    setUnit('unit');
-    setUnitPrice(100);
+    setCode('');
+    setName('');
+    setUnit('');
+    setUnitPrice(0);
     setTaxId(defaultTaxId);
     setFormError(null);
   }
@@ -1931,9 +1923,9 @@ function ProductModule({
 
       {showCreate ? (
         <FormPanel title={t('createProduct')} onSubmit={submit} onCancel={() => setShowCreate(false)} t={t} error={formError}>
-          <TextField label={t('code')} value={code} onChange={setCode} />
-          <TextField label={t('name')} value={name} onChange={setName} />
-          <TextField label={t('unit')} value={unit} onChange={setUnit} />
+          <TextField label={t('code')} value={code} onChange={setCode} placeholder={t('productCodePlaceholder')} />
+          <TextField label={t('name')} value={name} onChange={setName} placeholder={t('productNamePlaceholder')} />
+          <TextField label={t('unit')} value={unit} onChange={setUnit} placeholder={t('unitPlaceholder')} />
           <NumberField label={t('price')} value={unitPrice} onChange={setUnitPrice} />
           <SelectField
             label={t('tax')}
@@ -2022,9 +2014,9 @@ function LineItemsEditor({
   const taxes = (state.taxes ?? []).filter((tax) => tax.enabled);
   const defaultTaxId = taxes.find((tax) => tax.id === 'tax-none')?.id ?? taxes[0]?.id ?? '';
   const [newProductCode, setNewProductCode] = useState(defaultProductCode());
-  const [newProductName, setNewProductName] = useState('CODEX_TEST Quick Product');
-  const [newProductUnit, setNewProductUnit] = useState('unit');
-  const [newProductPrice, setNewProductPrice] = useState(100);
+  const [newProductName, setNewProductName] = useState('');
+  const [newProductUnit, setNewProductUnit] = useState('');
+  const [newProductPrice, setNewProductPrice] = useState(0);
   const [newProductTaxId, setNewProductTaxId] = useState(defaultTaxId);
 
   function updateItem(id: string, patch: Partial<LineItem>) {
@@ -2071,7 +2063,7 @@ function LineItemsEditor({
   }
 
   function addLine() {
-    onChange([...items, lineFromProduct(state, 'CODEX_TEST Line item', 100)]);
+    onChange([...items, lineFromProduct(state, '', 0)]);
   }
 
   function removeLine(id: string) {
@@ -2106,9 +2098,9 @@ function LineItemsEditor({
       updateItem(targetItem.id, productPatch(created, resultTaxes));
     }
     setNewProductCode(defaultProductCode());
-    setNewProductName('CODEX_TEST Quick Product');
-    setNewProductUnit('unit');
-    setNewProductPrice(100);
+    setNewProductName('');
+    setNewProductUnit('');
+    setNewProductPrice(0);
     setNewProductTaxId(defaultTaxId);
     onError(null);
   }
@@ -2121,9 +2113,9 @@ function LineItemsEditor({
           <span>{t('newProduct')}</span>
         </div>
         <div className="inline-create-row">
-          <TextField label={t('code')} value={newProductCode} onChange={setNewProductCode} />
-          <TextField label={t('name')} value={newProductName} onChange={setNewProductName} />
-          <TextField label={t('unit')} value={newProductUnit} onChange={setNewProductUnit} />
+          <TextField label={t('code')} value={newProductCode} onChange={setNewProductCode} placeholder={t('productCodePlaceholder')} />
+          <TextField label={t('name')} value={newProductName} onChange={setNewProductName} placeholder={t('productNamePlaceholder')} />
+          <TextField label={t('unit')} value={newProductUnit} onChange={setNewProductUnit} placeholder={t('unitPlaceholder')} />
           <NumberField label={t('price')} value={newProductPrice} onChange={setNewProductPrice} />
           <SelectField
             label={t('tax')}
@@ -2145,8 +2137,8 @@ function LineItemsEditor({
             onChange={(productId) => selectProduct(item, productId)}
             options={[{ value: '', label: t('none') }, ...products.map((product) => ({ value: product.id, label: product.name }))]}
           />
-          <TextField label={`${t('item')} ${index + 1}`} value={item.name} onChange={(name) => updateItem(item.id, { name })} />
-          <TextField label={t('unit')} value={item.unit} onChange={(unit) => updateItem(item.id, { unit })} />
+          <TextField label={`${t('item')} ${index + 1}`} value={item.name} onChange={(name) => updateItem(item.id, { name })} placeholder={t('lineItemPlaceholder')} />
+          <TextField label={t('unit')} value={item.unit} onChange={(unit) => updateItem(item.id, { unit })} placeholder={t('unitPlaceholder')} />
           <NumberField label={t('quantity')} value={item.quantity} onChange={(quantity) => updateItem(item.id, { quantity })} />
           <NumberField label={t('price')} value={item.unitPrice} onChange={(unitPrice) => updateItem(item.id, { unitPrice })} />
           <NumberField label={t('discount')} value={item.discount} onChange={(discount) => updateItem(item.id, { discount })} />
@@ -2193,11 +2185,21 @@ function LineItemsEditor({
   );
 }
 
-function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function TextField({
+  label,
+  value,
+  onChange,
+  placeholder = '',
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
   return (
     <label className="field">
       <span>{label}</span>
-      <input value={value} onChange={(event) => onChange(event.target.value)} />
+      <input value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }
@@ -2330,7 +2332,7 @@ function Reports({
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [status, setStatus] = useState<DocumentStatus | 'all'>('all');
-  const [filterName, setFilterName] = useState('CODEX_TEST Report Filter');
+  const [filterName, setFilterName] = useState('');
   const [filterError, setFilterError] = useState<string | null>(null);
   const [pendingDeleteFilterId, setPendingDeleteFilterId] = useState<string | null>(null);
   const filterSettings: ReportFilterSettings = {
@@ -2518,7 +2520,7 @@ function Reports({
           </button>
         </div>
         <div className="report-filter-grid">
-          <TextField label={t('reportFilterName')} value={filterName} onChange={setFilterName} />
+          <TextField label={t('reportFilterName')} value={filterName} onChange={setFilterName} placeholder={t('reportFilterPlaceholder')} />
           <SelectField
             label={t('reportType')}
             value={selectedReportKey}

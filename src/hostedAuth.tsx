@@ -151,7 +151,7 @@ export function HostedAuthProvider({ children }: { children: ReactNode }) {
         if (!active) return;
         if (membershipError) throw membershipError;
         if (!data) {
-          setError('This user is not assigned to a demo organization.');
+          setError('This user is not assigned to an organization.');
           return;
         }
         const org = Array.isArray(data.organizations) ? data.organizations[0] : data.organizations;
@@ -162,9 +162,9 @@ export function HostedAuthProvider({ children }: { children: ReactNode }) {
           baseCurrency: org.base_currency,
         });
         setRoleKey(data.role_key as HostedRoleKey);
-        setDisplayName(profile?.display_name || profile?.email || session.user.email || 'Demo user');
+        setDisplayName(profile?.display_name || profile?.email || session.user.email || 'User');
       } catch (loadError) {
-        if (active) setError(loadError instanceof Error ? loadError.message : 'Could not load demo organization.');
+        if (active) setError(loadError instanceof Error ? loadError.message : 'Could not load organization.');
       } finally {
         if (active) setLoading(false);
       }
@@ -210,11 +210,11 @@ export function HostedAuthProvider({ children }: { children: ReactNode }) {
   }
 
   if (!config.configured || !client) {
-    return <AuthMessage title="Supabase is not configured" body="Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY before running hosted tester mode." />;
+    return <AuthMessage title="Service is not configured" body="Please contact the system administrator before signing in." />;
   }
 
   if (loading && !session) {
-    return <AuthMessage title="Loading session" body="Checking the hosted tester session." />;
+    return <AuthMessage title="Loading session" body="Checking your session." />;
   }
 
   if (!session) {
@@ -222,11 +222,11 @@ export function HostedAuthProvider({ children }: { children: ReactNode }) {
   }
 
   if (loading) {
-    return <AuthMessage title="Loading organization" body="Checking your demo organization membership." />;
+    return <AuthMessage title="Loading organization" body="Checking your organization membership." />;
   }
 
   if (!organization || !roleKey) {
-    return <AuthMessage title="Access denied" body={error ?? 'This user is not assigned to a demo organization.'} />;
+    return <AuthMessage title="Access denied" body={error ?? 'This user is not assigned to an organization.'} />;
   }
 
   return <HostedAuthContext.Provider value={value}>{children}</HostedAuthContext.Provider>;

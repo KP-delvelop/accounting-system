@@ -11,6 +11,9 @@ const ownerActor = {
   permissions: [],
 };
 
+let lifecycleCustomerId = '';
+let lifecycleVendorId = '';
+
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -133,7 +136,7 @@ function assertUniqueDocumentNumbers(state) {
 
 async function createSalesDocument(payload = {}) {
   const result = await action('sales_document.create', {
-    contactId: 'contact-demo-customer',
+    contactId: lifecycleCustomerId,
     documentDate: '2026-09-01',
     dueDate: '2026-09-30',
     reference: 'CODEX_LIFECYCLE_SALES_REF',
@@ -148,7 +151,7 @@ async function createSalesDocument(payload = {}) {
 
 async function createPurchaseDocument(payload = {}) {
   const result = await action('purchase_document.create', {
-    contactId: 'contact-general-vendor',
+    contactId: lifecycleVendorId,
     documentDate: '2026-09-01',
     dueDate: '2026-09-30',
     orderNumber: 'CODEX_LIFECYCLE_PO_REF',
@@ -172,6 +175,26 @@ async function createUsdCustomer() {
   return result.body.state.contacts.find((contact) => contact.code === 'CODEX_LIFECYCLE_USD');
 }
 
+async function createLifecycleContacts() {
+  const customer = await action('customer.create', {
+    name: 'CODEX_LIFECYCLE_CUSTOMER',
+    code: 'CODEX_LIFECYCLE_CUSTOMER',
+    currency: 'LAK',
+  });
+  assert(customer.status === 200 && customer.body?.ok === true, 'lifecycle customer create should pass');
+  lifecycleCustomerId = customer.body.state.contacts.find((contact) => contact.code === 'CODEX_LIFECYCLE_CUSTOMER')?.id;
+  assert(lifecycleCustomerId, 'lifecycle customer fixture should exist');
+
+  const vendor = await action('vendor.create', {
+    name: 'CODEX_LIFECYCLE_VENDOR',
+    code: 'CODEX_LIFECYCLE_VENDOR',
+    currency: 'LAK',
+  });
+  assert(vendor.status === 200 && vendor.body?.ok === true, 'lifecycle vendor create should pass');
+  lifecycleVendorId = vendor.body.state.contacts.find((contact) => contact.code === 'CODEX_LIFECYCLE_VENDOR')?.id;
+  assert(lifecycleVendorId, 'lifecycle vendor fixture should exist');
+}
+
 async function run() {
   const health = await request('/api/health');
   assert(health.status === 200 && health.body?.ok === true, 'health endpoint failed');
@@ -183,6 +206,7 @@ async function run() {
     'X-Codex-Reset-Reason': 'initial-seed',
   });
   assert(reset.status === 200 && reset.body?.ok === true, 'initial reset failed');
+  await createLifecycleContacts();
 
   const salesDraftResult = await createSalesDocument({ status: 'draft', reference: 'CODEX_LIFECYCLE_SALES_DRAFT_REF' });
   const salesDraft = salesDraftResult.body.state.documents[0];
